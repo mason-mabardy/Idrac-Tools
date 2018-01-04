@@ -11,6 +11,9 @@ Function Set-iDRACPassword{
     Set-iDRACPassword -iDRACIP $idrac -OldPassword $oldpass -NewPassword $newpass
     NOTE: Function requires password parameters to be secure strings
 
+    .Parameter DHCPServer
+    Hostname of DHCP server
+
     .PARAMETER iDRACIP
     IP address for individual iDRAC
 
@@ -19,23 +22,30 @@ Function Set-iDRACPassword{
 
     .Parameter NewPassword
     New iDRAC password, MUST be secure string
+
+    .Parameter ScopeID
+    OOB ScopeID
     #>
     [CmdletBinding()]
     Param(
         [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=0)]
+        [String]$DHCPServer,
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=1)]
         [ValidateScript({$_ -match [IPAddress]$_})]
         [String]$iDRACIP,
-        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=1)]
-        [Security.SecureString]$OldPassword,
         [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=2)]
-        [Security.SecureString]$NewPassword
+        [Security.SecureString]$OldPassword,
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=3)]
+        [Security.SecureString]$NewPassword,
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=4)]
+        [String]$ScopeID
     )
 
     $PlainTextOldPass = Decrypt-SecureString $OldPassword
     $PlainTextNewPass = Decrypt-SecureString $NewPassword
 
     $target = 'root@'+$iDRACIP
-    $tempverbose = ([system.net.dns]::GetHostbyAddress("$idracip")).Hostname
+    $tempverbose = (Get-DhcpServerv4Lease -ComputerName $DHCPServer -ScopeId $ScopeID | Where-Object {$_.ipaddress -eq $iDRACIP}).hostname
     Write-Verbose -Message "Changing password for: $tempverbose"
     plink $target -pw $PlainTextOldPass "racadm set iDRAC.Users.2.Password" $PlainTextNewPass
 
@@ -117,6 +127,6 @@ function Set-AlliDRACPasswords {
 
     foreach($idrac in $idracs){
         $tempIP = ($idrac.IPAddress.IPAddressToString)
-        Set-iDRACPassword -iDRACIP $tempIP -OldPassword $OldPassword -NewPassword $NewPassword
+        Set-iDRACPassword -DHCPServer $DHCPServer -iDRACIP $tempIP -OldPassword $OldPassword -NewPassword $NewPassword -ScopeID $ScopeID
     }
 }
