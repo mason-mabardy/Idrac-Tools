@@ -7,12 +7,10 @@ Function Set-iDRACPassword{
     Uses IP address, old password, new password, and plink to change password for one iDRAC
     
     .EXAMPLE
-    Set-iDRACPassword -iDRACIP "10.10.10.12" -OldPassword $oldpass -NewPassword $newpass
+    Set-iDRACPassword -iDRACIP "10.10.10.12" -OldPassword $oldpass -NewPassword $newpass -UserName "root"
     Set-iDRACPassword -iDRACIP $idrac -OldPassword $oldpass -NewPassword $newpass
     NOTE: Function requires password parameters to be secure strings
 
-    .Parameter DHCPServer
-    Hostname of DHCP server
 
     .PARAMETER iDRACIP
     IP address for individual iDRAC
@@ -23,31 +21,41 @@ Function Set-iDRACPassword{
     .Parameter NewPassword
     New iDRAC password, MUST be secure string
 
-    .Parameter ScopeID
-    OOB ScopeID
+    .Parameter UserName
+    User name of account to change can be either root or svcuser
+
     #>
     [CmdletBinding()]
     Param(
         [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=0)]
-        [String]$DHCPServer,
-        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=1)]
         [ValidateScript({$_ -match [IPAddress]$_})]
         [String]$iDRACIP,
-        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=2)]
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=1)]
         [Security.SecureString]$OldPassword,
-        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=3)]
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=2)]
         [Security.SecureString]$NewPassword,
-        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=4)]
-        [String]$ScopeID
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=3)]
+        [String]$UserName
     )
 
     $PlainTextOldPass = Decrypt-SecureString $OldPassword
     $PlainTextNewPass = Decrypt-SecureString $NewPassword
-
-    $target = 'root@'+$iDRACIP
-    $tempverbose = (Get-DhcpServerv4Lease -ComputerName $DHCPServer -ScopeId $ScopeID | Where-Object {$_.ipaddress -eq $iDRACIP}).hostname
-    Write-Verbose -Message "Changing password for: $tempverbose"
-    plink $target -pw $PlainTextOldPass "racadm set iDRAC.Users.2.Password" $PlainTextNewPass
+    
+    switch ($UserName){
+        "root"{
+            $target = 'root@'+$iDRACIP
+            plink $target -pw $PlainTextOldPass "racadm set iDRAC.Users.2.Password" $PlainTextNewPass
+        }
+        "svcuser"{
+            $target = 'root@'+$iDRACIP
+            plink $target -pw $PlainTextOldPass "racadm set iDRAC.Users.3.Password" $PlainTextNewPass
+        }
+        default{
+            Write-Error -Message $username" is not a valid username"
+        }
+    }
+    #$target = 'root@'+$iDRACIP
+    #plink $target -pw $PlainTextOldPass "racadm set iDRAC.Users.2.Password" $PlainTextNewPass
 
 }
 
@@ -119,7 +127,9 @@ function Set-AlliDRACPasswords {
         [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=2)]
         [Security.SecureString]$OldPassword,
         [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=3)]
-        [Security.SecureString]$NewPassword
+        [Security.SecureString]$NewPassword,
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=4)]
+        [String]$UserName
     )
     
     #Create HashTable of iDRACs from DHCP server
@@ -127,6 +137,8 @@ function Set-AlliDRACPasswords {
 
     foreach($idrac in $idracs){
         $tempIP = ($idrac.IPAddress.IPAddressToString)
-        Set-iDRACPassword -DHCPServer $DHCPServer -iDRACIP $tempIP -OldPassword $OldPassword -NewPassword $NewPassword -ScopeID $ScopeID
+        $tempverbose = (Get-DhcpServerv4Lease -ComputerName $DHCPServer -ScopeId $ScopeID | Where-Object {$_.ipaddress -eq $tempIP}).hostname
+        Write-Verbose -Message "Changing password for: $tempverbose"    
+        Set-iDRACPassword -iDRACIP $tempIP -OldPassword $OldPassword -NewPassword $NewPassword -UserName $UserName
     }
 }
