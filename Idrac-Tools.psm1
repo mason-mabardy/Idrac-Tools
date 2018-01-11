@@ -101,7 +101,7 @@ function Set-AlliDRACPasswords {
     Using this info, extracts the IPs for the iDRACs, loops through the list, logs in, and changes password
     
     .EXAMPLE
-    Set-iDRACPassword -DHCPServer "lab-dhcp-01" -ScopeID "10.10.10.0" -OldPassword $oldpass -NewPassword $newpass
+    Set-iDRACPassword -DHCPServer "lab-dhcp-01" -ScopeID "10.10.10.0" -OldPassword $oldpass -NewPassword $newpass -UserName "svcuser"
     Note: function will ask for passwords interactively so they are never on screen as plain text
 
     .PARAMETER DHCPServer
@@ -115,6 +115,9 @@ function Set-AlliDRACPasswords {
 
     .Parameter NewPassword
     New iDRAC password, MUST be secure string
+
+    .Parameter UserName
+    Target username of password change
     #>
 
     [CmdletBinding()]
